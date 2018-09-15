@@ -1,4 +1,4 @@
-# Router
+# Router [![Build Status](https://travis-ci.org/chrisolsen/router.svg?branch=master)](https://travis-ci.org/chrisolsen/router) [![Coverage Status](https://coveralls.io/repos/github/chrisolsen/router/badge.svg?branch=master)](https://coveralls.io/github/chrisolsen/router?branch=master)
 
 Provides simple routing capabilities. 
 
