@@ -8,15 +8,13 @@ import (
 
 var paramsCtxKey = ctxKey{"params"}
 
-type handlerFunc = func(http.ResponseWriter, *http.Request)
-
 type ctxKey struct {
 	name string
 }
 
 type props struct {
 	method  string
-	fn      handlerFunc
+	fn      http.HandlerFunc
 	handler http.Handler
 }
 
@@ -24,7 +22,7 @@ type props struct {
 type Router struct {
 	basePath        string
 	routes          map[string]props
-	notFoundHandler handlerFunc
+	notFoundHandler http.HandlerFunc
 }
 
 // New creates a new router, allowing for the setup of route handling
@@ -63,32 +61,32 @@ func (r Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 // HandleFunc allows the handler to be called when the path matches the request's url path
-func (r Router) HandleFunc(method, path string, fn handlerFunc) {
+func (r Router) HandleFunc(method, path string, fn http.HandlerFunc) {
 	r.routes[path] = props{method: method, fn: fn}
 }
 
 // Get handles GET requests
-func (r Router) Get(path string, fn handlerFunc) {
+func (r Router) Get(path string, fn http.HandlerFunc) {
 	r.routes[path] = props{method: http.MethodGet, fn: fn}
 }
 
 // Post handles POST requests
-func (r Router) Post(path string, fn handlerFunc) {
+func (r Router) Post(path string, fn http.HandlerFunc) {
 	r.routes[path] = props{method: http.MethodPost, fn: fn}
 }
 
 // Put handles PUT requests
-func (r Router) Put(path string, fn handlerFunc) {
+func (r Router) Put(path string, fn http.HandlerFunc) {
 	r.routes[path] = props{method: http.MethodPut, fn: fn}
 }
 
 // Delete handles DELETE requests
-func (r Router) Delete(path string, fn handlerFunc) {
+func (r Router) Delete(path string, fn http.HandlerFunc) {
 	r.routes[path] = props{method: http.MethodDelete, fn: fn}
 }
 
 // Patch handles PATCH requests
-func (r Router) Patch(path string, fn handlerFunc) {
+func (r Router) Patch(path string, fn http.HandlerFunc) {
 	r.routes[path] = props{method: http.MethodPatch, fn: fn}
 }
 
@@ -98,7 +96,7 @@ func (r Router) Handle(path string, h http.Handler) {
 }
 
 // NotFound allows for a custom 404 handler to be set
-func (r *Router) NotFound(h handlerFunc) {
+func (r *Router) NotFound(h http.HandlerFunc) {
 	r.notFoundHandler = h
 }
 
