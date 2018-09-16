@@ -6,7 +6,7 @@ Provides simple routing capabilities.
 func main() {
     rr := router.New("/")
 
-    rr.HandleFunc("GET", "/", func(w http.ResponseWriter, r *http.Request) {
+    rr.Get("/", func(w http.ResponseWriter, r *http.Request) {
         fmt.Fprintln(w, "Hello world")
     })
 
@@ -25,9 +25,16 @@ rr.Get("/users/:name", func(w http.ResponseWriter, r *http.Request) {
 })
 ```
 
-## Use http.Handler
+## Use handlers
 ```Go
-rr.Handle("GET", "/users", usersHandler{})
+type usersHandler struct {
+    svc aService
+}
+func (h usersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+    h.svc.doSomething()
+}
+
+rr.Handle("GET", "/users", usersHandler{svc: Service.New()})
 ```
 
 ## 404 handling
@@ -40,7 +47,7 @@ rr.NotFound(func(w http.ResponseWriter, r *http.Request) {
 ## Wildcard params
 ```Go
 // GET: /hello/go/programmer
-rr.HandleFunc("GET", "/hello/*", func(w http.ResponseWriter, r *http.Request) {
+rr.Get("/hello/*", func(w http.ResponseWriter, r *http.Request) {
     wildcard := router.Param(r.Context(), "*") // => "go/programmer"
     vals = strings.Split(wildcard, "/")
     fmt.Fprintf(w, "Hello %s %s", vals[0], vals[1])
