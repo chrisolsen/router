@@ -22,6 +22,7 @@ type props struct {
 type Router struct {
 	basePath        string
 	routes          map[string]props
+	subRouters      []*Router
 	notFoundHandler http.HandlerFunc
 }
 
@@ -37,7 +38,8 @@ func New(path string) Router {
 }
 
 func (r Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	for path, props := range r.routes {
+	rr := r.findMatchingRouter(req.URL.Path)
+	for path, props := range rr.routes {
 		// handler accepts all method types
 		if props.method != req.Method && props.handler == nil {
 			continue
@@ -63,6 +65,20 @@ func (r Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 // HandleFunc allows the handler to be called when the path matches the request's url path
 func (r Router) HandleFunc(method, path string, fn http.HandlerFunc) {
 	r.routes[path] = props{method: method, fn: fn}
+}
+
+// SubRouter creates a child router with a custom base path
+func (r *Router) SubRouter(path string) *Router {
+	var basePath string
+	if r.basePath != "/" {
+		basePath = r.basePath
+	}
+	sub := Router{
+		basePath: basePath + path,
+		routes:   make(map[string]props),
+	}
+	r.subRouters = append(r.subRouters, &sub)
+	return &sub
 }
 
 // Get handles GET requests
@@ -113,6 +129,19 @@ func Params(c context.Context) map[string]string {
 // Param gets the names url param
 func Param(c context.Context, key string) string {
 	return Params(c)[key]
+}
+
+// Finds the matching router
+func (r Router) findMatchingRouter(urlPath string) *Router {
+	for _, child := range r.subRouters {
+		if r := child.findMatchingRouter(urlPath); r != nil {
+			return r
+		}
+	}
+	if strings.Index(urlPath, r.basePath) == 0 {
+		return &r
+	}
+	return nil
 }
 
 func matches(pattern, path string) (bool, map[string]string) {

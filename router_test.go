@@ -269,6 +269,7 @@ func TestNotFound(t *testing.T) {
 
 func TestUrlParamsAreExtractedIntoContext(t *testing.T) {
 	tests := []struct {
+		isSubRoute  bool
 		handlerFunc http.HandlerFunc
 		method      string
 		pathMatcher string
@@ -300,11 +301,29 @@ func TestUrlParamsAreExtractedIntoContext(t *testing.T) {
 				}
 			},
 		},
+		{
+			isSubRoute:  true,
+			method:      "GET",
+			pathMatcher: "/admin/tasks/:taskid",
+			path:        "/admin/tasks/456",
+			handlerFunc: func(w http.ResponseWriter, r *http.Request) {
+				taskid := Param(r.Context(), "taskid")
+				if taskid != "456" {
+					t.Errorf("failed to extract url param: %s expected, got %s", "456", taskid)
+				}
+			},
+		},
 	}
 
 	for _, test := range tests {
 		router := New("/")
-		router.HandleFunc(test.method, test.pathMatcher, test.handlerFunc)
+		subrouter := router.SubRouter("/admin")
+
+		if test.isSubRoute {
+			subrouter.HandleFunc(test.method, test.pathMatcher, test.handlerFunc)
+		} else {
+			router.HandleFunc(test.method, test.pathMatcher, test.handlerFunc)
+		}
 
 		req, err := http.NewRequest(test.method, test.path, nil)
 		if err != nil {
@@ -478,6 +497,67 @@ func TestSlicePath(t *testing.T) {
 				t.Errorf("item doesn't match: %s != %s", item, result[i])
 				return
 			}
+		}
+	}
+}
+
+func TestSubRouterMatching(t *testing.T) {
+	r := New("/")
+	s := r.SubRouter("/admin")
+	ss := s.SubRouter("/payroll")
+
+	rtests := []struct {
+		path    string
+		matches bool
+	}{
+		{"/", true},
+		{"/a", true},
+		{"/a/b", true},
+		{"/admin/a", false},
+		{"/admin/payroll/a", false},
+		{"/payroll", true},
+	}
+	for _, test := range rtests {
+		matches := r.findMatchingRouter(test.path).basePath == r.basePath
+		if test.matches != matches {
+			t.Errorf("failed to match: %s => %s", test.path, r.basePath)
+		}
+	}
+
+	stests := []struct {
+		path    string
+		matches bool
+	}{
+		{"/", false},
+		{"/a", false},
+		{"/a/b", false},
+		{"/admin/a", true},
+		{"/admin/payroll/a", false},
+		{"/payroll", false},
+	}
+	for _, test := range stests {
+		matches := r.findMatchingRouter(test.path).basePath == s.basePath
+		if test.matches != matches {
+			t.Errorf("failed to match: %s => %s", test.path, s.basePath)
+		}
+	}
+
+	sstests := []struct {
+		path    string
+		matches bool
+	}{
+		{"/", false},
+		{"/a", false},
+		{"/a/b", false},
+		{"/admin/a", false},
+		{"/admin/payroll/a", true},
+		{"/payroll", false},
+	}
+	for _, test := range sstests {
+		matchingRouter := r.findMatchingRouter(test.path)
+		matches := matchingRouter.basePath == ss.basePath
+		if test.matches != matches {
+			t.Errorf("failed to match: %s => %s", test.path, ss.basePath)
 		}
 	}
 }
