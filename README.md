@@ -16,6 +16,29 @@ func main() {
 }
 ```
 
+## Subroute
+```Go
+func main() {
+    rr := router.New("/")
+    subrr := rr.SubRouter("/admin")
+
+    // GET /
+    rr.Get("/", func(w http.ResponseWriter, r *http.Request) {
+        fmt.Fprintln(w, "Hello world")
+    })
+
+    // GET /admin/payroll
+    subrr.Get("/payroll", func(w http.ResponseWriter, r *http.Request) {
+        fmt.Fprintln(w, "in /admin/payroll")
+    })
+
+    if err := http.ListenAndServe(":80", rr); err != nil {
+        fmt.Printf("failed to start server: %v", err.Error())
+    }
+}
+```
+
+
 ## Extract URL params
 
 ```Go
