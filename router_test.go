@@ -192,8 +192,6 @@ func TestServeHTTPParams(t *testing.T) {
 			return
 		}
 	}
-
-	// 3. validate handling of Handlers
 }
 
 func TestNotFound(t *testing.T) {
