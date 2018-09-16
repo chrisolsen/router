@@ -81,7 +81,7 @@ func TestNewRouter(t *testing.T) {
 
 }
 
-func TestServeHTTPParams(t *testing.T) {
+func TestServeHTTPHandlers(t *testing.T) {
 
 	tests := []struct {
 		handlerMethod string
