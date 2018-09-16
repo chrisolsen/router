@@ -59,10 +59,6 @@ func TestRouteMatching(t *testing.T) {
 	}
 }
 
-func TestProps(t *testing.T) {
-	// r := New()
-}
-
 func TestNewRouter(t *testing.T) {
 	tests := []struct {
 		expectedPath string
