@@ -32,7 +32,7 @@ func (r *Router) Before(fns ...http.HandlerFunc) {
 }
 
 // Run executes the handler chain, followed by the final http handler passed in
-func (r Router) Run(last http.HandlerFunc) http.HandlerFunc {
+func (r Router) run(last http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		for _, fn := range r.mw {
 			fn(w, req)
@@ -55,6 +55,13 @@ func New(path string) Router {
 	}
 }
 
+func setURLParams(r *http.Request, params map[string]string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		c := context.WithValue(r.Context(), paramsCtxKey, params)
+		*r = *r.WithContext(c)
+	}
+}
+
 func (r Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	rr := r.findMatchingRouter(req.URL.Path)
 	for path, props := range rr.routes {
@@ -64,13 +71,16 @@ func (r Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 		fullPattern := strings.Join([]string{r.basePath, path}, "")
 		if ok, params := matches(fullPattern, req.URL.Path); ok {
-			c := context.WithValue(req.Context(), paramsCtxKey, params)
-			req = req.WithContext(c)
+			var handler http.HandlerFunc
 			if props.fn != nil {
-				props.fn(w, req)
+				handler = props.fn
 			} else if props.handler != nil {
-				props.handler.ServeHTTP(w, req)
+				handler = props.handler.ServeHTTP
 			}
+
+			rr.Before(setURLParams(req, params))
+			rr.run(handler)(w, req)
+
 			return
 		}
 	}

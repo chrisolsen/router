@@ -190,7 +190,7 @@ func TestServeHTTPHandlers(t *testing.T) {
 			return
 		}
 		if rec.Body.String() != test.expectedResponse {
-			t.Errorf("Invalid status code %s != %s", rec.Body.String(), test.expectedResponse)
+			t.Errorf("Invalid body %s != %s", rec.Body.String(), test.expectedResponse)
 			return
 		}
 	}
@@ -267,7 +267,7 @@ func TestMiddleware(t *testing.T) {
 		}
 		w := httptest.NewRecorder()
 
-		rr.Run(test.handler)(w, r)
+		rr.run(test.handler)(w, r)
 		wg.Wait()
 	}
 }
