@@ -6,11 +6,9 @@ import (
 	"strings"
 )
 
-var paramsCtxKey = ctxKey{"params"}
+type ctxKey string
 
-type ctxKey struct {
-	name string
-}
+var paramsCtxKey = ctxKey("params")
 
 type props struct {
 	method  string
@@ -24,6 +22,26 @@ type Router struct {
 	routes          map[string]props
 	subRouters      []*Router
 	notFoundHandler http.HandlerFunc
+
+	mw []http.HandlerFunc
+}
+
+// Before injects the passed in handler functions into the handler chain
+func (r *Router) Before(fns ...http.HandlerFunc) {
+	r.mw = append(r.mw, fns...)
+}
+
+// Run executes the handler chain, followed by the final http handler passed in
+func (r Router) Run(last http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		for _, fn := range r.mw {
+			fn(w, req)
+			if req.Context().Err() != nil {
+				return
+			}
+		}
+		last(w, req)
+	}
 }
 
 // New creates a new router, allowing for the setup of route handling

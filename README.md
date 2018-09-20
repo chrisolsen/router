@@ -22,21 +22,49 @@ func main() {
     rr := router.New("/")
     subrr := rr.SubRouter("/admin")
 
-    // GET /
     rr.Get("/", func(w http.ResponseWriter, r *http.Request) {
         fmt.Fprintln(w, "Hello world")
     })
 
-    // GET /admin/payroll
     subrr.Get("/payroll", func(w http.ResponseWriter, r *http.Request) {
         fmt.Fprintln(w, "in /admin/payroll")
     })
 
-    if err := http.ListenAndServe(":80", rr); err != nil {
-        fmt.Printf("failed to start server: %v", err.Error())
-    }
+    http.ListenAndServe(":80", rr)
 }
 ```
+
+## Middleware
+```Go
+
+type tokenMiddleware struct { }
+
+func (t tokenMiddleware) SetToken(r *http.Request) {
+    token := generateToken()
+    c2 := context.WithValue(r.Context(), "key", token)
+    *r = *r.WithContext(c2)
+}
+
+func (t tokenMiddleware) Token(c context.Context) string {
+    return c.Value("key").(string)  // might want to be more cautious than this
+}
+
+func main() {
+    rr := router.New("/")
+
+    rr.Before(func (w http.ResponseWriter, r *http.Request) {
+        tokenMiddleware.SetToken(r)
+    })
+
+    rr.Get("/", func(w http.ResponseWriter, r *http.Request) {
+        token := tokenMiddleware.Token(r.Context())
+        fmt.Fprintf(w, "TOKEN: %s", token)
+    })
+
+    http.ListenAndServe(":80", rr)
+}
+```
+
 
 
 ## Extract URL params

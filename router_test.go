@@ -4,7 +4,9 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
+	"time"
 )
 
 type testHandler struct {
@@ -191,6 +193,82 @@ func TestServeHTTPHandlers(t *testing.T) {
 			t.Errorf("Invalid status code %s != %s", rec.Body.String(), test.expectedResponse)
 			return
 		}
+	}
+}
+
+func TestMiddleware(t *testing.T) {
+	testKey := ctxKey("test")
+	ch := make(chan bool)
+
+	tests := []struct {
+		desc       string
+		err        string
+		middleware []http.HandlerFunc
+		handler    http.HandlerFunc
+	}{
+		{
+			desc: "handlerFunc is called",
+			err:  "context data not set correctly",
+			middleware: []http.HandlerFunc{
+				func(w http.ResponseWriter, r *http.Request) {
+					ctx := context.WithValue(r.Context(), testKey, "bar")
+					*r = *r.WithContext(ctx)
+				},
+			},
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				data := r.Context().Value(testKey)
+				switch data.(type) {
+				case string:
+					ch <- (data.(string) == "bar")
+				default:
+					ch <- false
+				}
+			},
+		},
+		{
+			desc: "error exists in middleware, so later middleware should not be called",
+			err:  "final method should not be called",
+			middleware: []http.HandlerFunc{
+				func(w http.ResponseWriter, r *http.Request) {
+					ctx, cancel := context.WithCancel(r.Context())
+					*r = *r.WithContext(ctx)
+					cancel()
+				},
+			},
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				ch <- false
+			},
+		},
+	}
+
+	for _, test := range tests {
+		rr := New("/")
+		rr.Before(test.middleware...)
+		rr.Get("/", test.handler)
+
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+		go (func() {
+			select {
+			case val := <-ch:
+				if !val {
+					t.Error(test.err)
+				}
+				wg.Done()
+			case <-time.Tick(100 * time.Millisecond):
+				wg.Done()
+			}
+		})()
+
+		r, err := http.NewRequest("GET", "/", nil)
+		if err != nil {
+			t.Error("failed to create request")
+			return
+		}
+		w := httptest.NewRecorder()
+
+		rr.Run(test.handler)(w, r)
+		wg.Wait()
 	}
 }
 
@@ -443,6 +521,8 @@ func TestHandle(t *testing.T) {
 
 // validate Params
 func TestParams(t *testing.T) {
+	var paramsCtxKey = ctxKey("params")
+
 	params := map[string]string{
 		"foo": "bar",
 	}
