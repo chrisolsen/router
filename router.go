@@ -16,6 +16,38 @@ type props struct {
 	handler http.Handler
 }
 
+// New creates a new router, allowing for the setup of route handling
+func New(path string) Router {
+	if len(path) == 0 {
+		path = "/"
+	}
+	return Router{
+		basePath: path,
+		routes:   make(map[string]props),
+	}
+}
+
+// BindContext links the new context with the request to allow for any context values
+// to be available later in the chain
+func BindContext(c context.Context, r *http.Request) {
+	*r = *r.WithContext(c)
+}
+
+// Params retrieves the url parameters matched
+func Params(c context.Context) map[string]string {
+	switch c.Value(paramsCtxKey).(type) {
+	case map[string]string:
+		return c.Value(paramsCtxKey).(map[string]string)
+	default:
+		return map[string]string{}
+	}
+}
+
+// Param gets the names url param
+func Param(c context.Context, key string) string {
+	return Params(c)[key]
+}
+
 // Router is a custom mux that allows for url parameter to be extracted from the path
 type Router struct {
 	basePath        string
@@ -41,30 +73,6 @@ func (r Router) run(last http.HandlerFunc) http.HandlerFunc {
 			}
 		}
 		last(w, req)
-	}
-}
-
-// New creates a new router, allowing for the setup of route handling
-func New(path string) Router {
-	if len(path) == 0 {
-		path = "/"
-	}
-	return Router{
-		basePath: path,
-		routes:   make(map[string]props),
-	}
-}
-
-// BindContext links the new context with the request to allow for any context values
-// to be available later in the chain
-func BindContext(c context.Context, r *http.Request) {
-	*r = *r.WithContext(c)
-}
-
-func setURLParams(r *http.Request, params map[string]string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		c := context.WithValue(r.Context(), paramsCtxKey, params)
-		*r = *r.WithContext(c)
 	}
 }
 
@@ -150,21 +158,6 @@ func (r *Router) NotFound(h http.HandlerFunc) {
 	r.notFoundHandler = h
 }
 
-// Params retrieves the url parameters matched
-func Params(c context.Context) map[string]string {
-	switch c.Value(paramsCtxKey).(type) {
-	case map[string]string:
-		return c.Value(paramsCtxKey).(map[string]string)
-	default:
-		return map[string]string{}
-	}
-}
-
-// Param gets the names url param
-func Param(c context.Context, key string) string {
-	return Params(c)[key]
-}
-
 // Finds the matching router
 func (r Router) findMatchingRouter(urlPath string) *Router {
 	for _, child := range r.subRouters {
@@ -224,4 +217,11 @@ func matches(pattern, path string) (bool, map[string]string) {
 
 func slicePath(path string) []string {
 	return strings.Split(strings.Trim(path, "/"), "/")
+}
+
+func setURLParams(r *http.Request, params map[string]string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		c := context.WithValue(r.Context(), paramsCtxKey, params)
+		*r = *r.WithContext(c)
+	}
 }
