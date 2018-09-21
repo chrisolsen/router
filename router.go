@@ -33,6 +33,14 @@ func BindContext(c context.Context, r *http.Request) {
 	*r = *r.WithContext(c)
 }
 
+// HaltRequest is most commonly called with the middleware to stop the middleware chain
+// from continuing as well as prevent the final handler from being run
+func HaltRequest(r *http.Request) {
+	ctx, cancel := context.WithCancel(r.Context())
+	BindContext(ctx, r)
+	cancel()
+}
+
 // Params retrieves the url parameters matched
 func Params(c context.Context) map[string]string {
 	switch c.Value(paramsCtxKey).(type) {

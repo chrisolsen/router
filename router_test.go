@@ -230,13 +230,14 @@ func TestMiddleware(t *testing.T) {
 			err:  "final method should not be called",
 			middleware: []http.HandlerFunc{
 				func(w http.ResponseWriter, r *http.Request) {
-					ctx, cancel := context.WithCancel(r.Context())
-					BindContext(ctx, r)
-					cancel()
+					HaltRequest(r)
+				},
+				func(w http.ResponseWriter, r *http.Request) {
+					ch <- false // should not make it here
 				},
 			},
 			handler: func(w http.ResponseWriter, r *http.Request) {
-				ch <- false
+				ch <- false // should not make it here
 			},
 		},
 	}
@@ -255,6 +256,7 @@ func TestMiddleware(t *testing.T) {
 					t.Error(test.err)
 				}
 				wg.Done()
+			// wait for any channel data
 			case <-time.Tick(100 * time.Millisecond):
 				wg.Done()
 			}

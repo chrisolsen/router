@@ -41,6 +41,13 @@ type tokenMiddleware struct { }
 
 func (t tokenMiddleware) SetToken(r *http.Request) {
     token := generateToken()
+
+    // middleware can halt the request
+    if token == nil {
+        r.WriteHeader(401)
+        router.HaltRequest(r)
+        return
+    }
     c2 := context.WithValue(r.Context(), "key", token)
     router.BindContext(c2, r)
 }
