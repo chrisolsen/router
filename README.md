@@ -42,7 +42,7 @@ type tokenMiddleware struct { }
 func (t tokenMiddleware) SetToken(r *http.Request) {
     token := generateToken()
     c2 := context.WithValue(r.Context(), "key", token)
-    *r = *r.WithContext(c2)
+    router.BindContext(c2, r)
 }
 
 func (t tokenMiddleware) Token(c context.Context) string {

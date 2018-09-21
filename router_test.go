@@ -212,7 +212,7 @@ func TestMiddleware(t *testing.T) {
 			middleware: []http.HandlerFunc{
 				func(w http.ResponseWriter, r *http.Request) {
 					ctx := context.WithValue(r.Context(), testKey, "bar")
-					*r = *r.WithContext(ctx)
+					BindContext(ctx, r)
 				},
 			},
 			handler: func(w http.ResponseWriter, r *http.Request) {
@@ -231,7 +231,7 @@ func TestMiddleware(t *testing.T) {
 			middleware: []http.HandlerFunc{
 				func(w http.ResponseWriter, r *http.Request) {
 					ctx, cancel := context.WithCancel(r.Context())
-					*r = *r.WithContext(ctx)
+					BindContext(ctx, r)
 					cancel()
 				},
 			},

@@ -55,6 +55,12 @@ func New(path string) Router {
 	}
 }
 
+// BindContext links the new context with the request to allow for any context values
+// to be available later in the chain
+func BindContext(c context.Context, r *http.Request) {
+	*r = *r.WithContext(c)
+}
+
 func setURLParams(r *http.Request, params map[string]string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		c := context.WithValue(r.Context(), paramsCtxKey, params)
