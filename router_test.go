@@ -426,6 +426,10 @@ func TestGetHelper(t *testing.T) {
 	rr.Get("/foo", func(w http.ResponseWriter, r *http.Request) {})
 
 	route := rr.routes[Route{method: http.MethodGet, path: "/foo"}]
+	if route == nil {
+		t.Error("no route found")
+		return
+	}
 	if route.fn == nil {
 		t.Error("handler is nil")
 		return
@@ -437,6 +441,10 @@ func TestPostHelper(t *testing.T) {
 	rr.Post("/foo", func(w http.ResponseWriter, r *http.Request) {})
 
 	route := rr.routes[Route{method: http.MethodPost, path: "/foo"}]
+	if route == nil {
+		t.Error("no route found")
+		return
+	}
 	if route.fn == nil {
 		t.Error("handler is nil")
 		return
@@ -448,6 +456,10 @@ func TestPuttHelper(t *testing.T) {
 	rr.Put("/foo", func(w http.ResponseWriter, r *http.Request) {})
 
 	route := rr.routes[Route{method: http.MethodPut, path: "/foo"}]
+	if route == nil {
+		t.Error("no route found")
+		return
+	}
 	if route.fn == nil {
 		t.Error("handler is nil")
 		return
@@ -458,6 +470,10 @@ func TestDeleteHelper(t *testing.T) {
 	rr.Delete("/foo", func(w http.ResponseWriter, r *http.Request) {})
 
 	route := rr.routes[Route{method: http.MethodDelete, path: "/foo"}]
+	if route == nil {
+		t.Error("no route found")
+		return
+	}
 	if route.fn == nil {
 		t.Error("handler is nil")
 		return
@@ -469,6 +485,10 @@ func TestPatchHelper(t *testing.T) {
 	rr.Patch("/foo", func(w http.ResponseWriter, r *http.Request) {})
 
 	route := rr.routes[Route{method: http.MethodPatch, path: "/foo"}]
+	if route == nil {
+		t.Error("no route found")
+		return
+	}
 	if route.fn == nil {
 		t.Error("handler is nil")
 		return
@@ -480,6 +500,10 @@ func TestHandlerFuncHelper(t *testing.T) {
 	rr.HandleFunc("GET", "/foo", func(w http.ResponseWriter, r *http.Request) {})
 
 	route := rr.routes[Route{method: http.MethodGet, path: "/foo"}]
+	if route == nil {
+		t.Error("no route found")
+		return
+	}
 	if route.fn == nil {
 		t.Error("handler is nil")
 		return
@@ -491,6 +515,10 @@ func TestHandle(t *testing.T) {
 	rr.Handle("/foo", testHandler{})
 
 	route := rr.routes[Route{path: "/foo"}]
+	if route == nil {
+		t.Error("no route found")
+		return
+	}
 	if route.handler == nil {
 		t.Error("handler is nil")
 		return

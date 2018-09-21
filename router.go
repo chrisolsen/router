@@ -28,7 +28,7 @@ func New(path string) Router {
 	}
 	return Router{
 		basePath: path,
-		routes:   make(map[Route]props),
+		routes:   make(map[Route]*props),
 	}
 }
 
@@ -64,7 +64,7 @@ func Param(c context.Context, key string) string {
 // Router is a custom mux that allows for url parameter to be extracted from the path
 type Router struct {
 	basePath        string
-	routes          map[Route]props
+	routes          map[Route]*props
 	subRouters      []*Router
 	notFoundHandler http.HandlerFunc
 
@@ -119,7 +119,7 @@ func (r Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 // HandleFunc allows the handler to be called when the path matches the request's url path
 func (r Router) HandleFunc(method, path string, fn http.HandlerFunc) {
-	r.bindRoute(method, path, props{fn: fn})
+	r.bindRoute(method, path, &props{fn: fn})
 }
 
 // SubRouter creates a child router with a custom base path
@@ -130,44 +130,44 @@ func (r *Router) SubRouter(path string) *Router {
 	}
 	sub := Router{
 		basePath: basePath + path,
-		routes:   make(map[Route]props),
+		routes:   make(map[Route]*props),
 	}
 	r.subRouters = append(r.subRouters, &sub)
 	return &sub
 }
 
-func (r Router) bindRoute(method, path string, p props) {
+func (r Router) bindRoute(method, path string, p *props) {
 	r.routes[Route{method: method, path: path}] = p
 }
 
 // Get handles GET requests
 func (r Router) Get(path string, fn http.HandlerFunc) {
-	r.bindRoute(http.MethodGet, path, props{fn: fn})
+	r.bindRoute(http.MethodGet, path, &props{fn: fn})
 }
 
 // Post handles POST requests
 func (r Router) Post(path string, fn http.HandlerFunc) {
-	r.bindRoute(http.MethodPost, path, props{fn: fn})
+	r.bindRoute(http.MethodPost, path, &props{fn: fn})
 }
 
 // Put handles PUT requests
 func (r Router) Put(path string, fn http.HandlerFunc) {
-	r.bindRoute(http.MethodPut, path, props{fn: fn})
+	r.bindRoute(http.MethodPut, path, &props{fn: fn})
 }
 
 // Delete handles DELETE requests
 func (r Router) Delete(path string, fn http.HandlerFunc) {
-	r.bindRoute(http.MethodDelete, path, props{fn: fn})
+	r.bindRoute(http.MethodDelete, path, &props{fn: fn})
 }
 
 // Patch handles PATCH requests
 func (r Router) Patch(path string, fn http.HandlerFunc) {
-	r.bindRoute(http.MethodPatch, path, props{fn: fn})
+	r.bindRoute(http.MethodPatch, path, &props{fn: fn})
 }
 
 // Handle foo
 func (r Router) Handle(path string, h http.Handler) {
-	r.routes[Route{path: path}] = props{handler: h}
+	r.routes[Route{path: path}] = &props{handler: h}
 }
 
 // NotFound allows for a custom 404 handler to be set
