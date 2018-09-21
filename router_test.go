@@ -425,11 +425,7 @@ func TestGetHelper(t *testing.T) {
 	rr := New("/")
 	rr.Get("/foo", func(w http.ResponseWriter, r *http.Request) {})
 
-	route := rr.routes["/foo"]
-	if route.method != http.MethodGet {
-		t.Error("method not set")
-		return
-	}
+	route := rr.routes[Route{method: http.MethodGet, path: "/foo"}]
 	if route.fn == nil {
 		t.Error("handler is nil")
 		return
@@ -440,11 +436,7 @@ func TestPostHelper(t *testing.T) {
 	rr := New("/")
 	rr.Post("/foo", func(w http.ResponseWriter, r *http.Request) {})
 
-	route := rr.routes["/foo"]
-	if route.method != http.MethodPost {
-		t.Error("method not set")
-		return
-	}
+	route := rr.routes[Route{method: http.MethodPost, path: "/foo"}]
 	if route.fn == nil {
 		t.Error("handler is nil")
 		return
@@ -455,11 +447,7 @@ func TestPuttHelper(t *testing.T) {
 	rr := New("/")
 	rr.Put("/foo", func(w http.ResponseWriter, r *http.Request) {})
 
-	route := rr.routes["/foo"]
-	if route.method != http.MethodPut {
-		t.Error("method not set")
-		return
-	}
+	route := rr.routes[Route{method: http.MethodPut, path: "/foo"}]
 	if route.fn == nil {
 		t.Error("handler is nil")
 		return
@@ -469,11 +457,7 @@ func TestDeleteHelper(t *testing.T) {
 	rr := New("/")
 	rr.Delete("/foo", func(w http.ResponseWriter, r *http.Request) {})
 
-	route := rr.routes["/foo"]
-	if route.method != http.MethodDelete {
-		t.Error("method not set")
-		return
-	}
+	route := rr.routes[Route{method: http.MethodDelete, path: "/foo"}]
 	if route.fn == nil {
 		t.Error("handler is nil")
 		return
@@ -484,11 +468,7 @@ func TestPatchHelper(t *testing.T) {
 	rr := New("/")
 	rr.Patch("/foo", func(w http.ResponseWriter, r *http.Request) {})
 
-	route := rr.routes["/foo"]
-	if route.method != http.MethodPatch {
-		t.Error("method not set")
-		return
-	}
+	route := rr.routes[Route{method: http.MethodPatch, path: "/foo"}]
 	if route.fn == nil {
 		t.Error("handler is nil")
 		return
@@ -499,11 +479,7 @@ func TestHandlerFuncHelper(t *testing.T) {
 	rr := New("/")
 	rr.HandleFunc("GET", "/foo", func(w http.ResponseWriter, r *http.Request) {})
 
-	route := rr.routes["/foo"]
-	if route.method != http.MethodGet {
-		t.Error("method not set")
-		return
-	}
+	route := rr.routes[Route{method: http.MethodGet, path: "/foo"}]
 	if route.fn == nil {
 		t.Error("handler is nil")
 		return
@@ -514,7 +490,7 @@ func TestHandle(t *testing.T) {
 	rr := New("/")
 	rr.Handle("/foo", testHandler{})
 
-	route := rr.routes["/foo"]
+	route := rr.routes[Route{path: "/foo"}]
 	if route.handler == nil {
 		t.Error("handler is nil")
 		return
