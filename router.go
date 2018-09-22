@@ -10,7 +10,7 @@ type ctxKey string
 
 var paramsCtxKey = ctxKey("params")
 
-type props struct {
+type ops struct {
 	fn      http.HandlerFunc
 	handler http.Handler
 }
@@ -28,7 +28,7 @@ func New(path string) Router {
 	}
 	return Router{
 		basePath: path,
-		routes:   make(map[Route]*props),
+		routes:   make(map[Route]*ops),
 	}
 }
 
@@ -64,7 +64,7 @@ func Param(c context.Context, key string) string {
 // Router is a custom mux that allows for url parameter to be extracted from the path
 type Router struct {
 	basePath        string
-	routes          map[Route]*props
+	routes          map[Route]*ops
 	subRouters      []*Router
 	notFoundHandler http.HandlerFunc
 
@@ -90,19 +90,16 @@ func (r Router) run(last http.HandlerFunc) http.HandlerFunc {
 }
 
 func (r Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	method := getMethod(req)
 	rr := r.findMatchingRouter(req.URL.Path)
-	for rparams, props := range rr.routes {
-		// handler accepts all method types
-		if rparams.method != req.Method && props.handler == nil {
-			continue
-		}
-		fullPattern := strings.Join([]string{r.basePath, rparams.path}, "")
-		if ok, params := matches(fullPattern, req.URL.Path); ok {
+	for route, ops := range rr.routes {
+		path := strings.Replace(req.URL.Path, r.basePath, "", 1)
+		if ok, params := matches(route, method, path, ops.handler != nil); ok {
 			var handler http.HandlerFunc
-			if props.fn != nil {
-				handler = props.fn
-			} else if props.handler != nil {
-				handler = props.handler.ServeHTTP
+			if ops.fn != nil {
+				handler = ops.fn
+			} else if ops.handler != nil {
+				handler = ops.handler.ServeHTTP
 			}
 
 			rr.Before(setURLParams(req, params))
@@ -119,7 +116,7 @@ func (r Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 // HandleFunc allows the handler to be called when the path matches the request's url path
 func (r Router) HandleFunc(method, path string, fn http.HandlerFunc) {
-	r.bindRoute(method, path, &props{fn: fn})
+	r.bindRoute(method, path, &ops{fn: fn})
 }
 
 // SubRouter creates a child router with a custom base path
@@ -130,44 +127,44 @@ func (r *Router) SubRouter(path string) *Router {
 	}
 	sub := Router{
 		basePath: basePath + path,
-		routes:   make(map[Route]*props),
+		routes:   make(map[Route]*ops),
 	}
 	r.subRouters = append(r.subRouters, &sub)
 	return &sub
 }
 
-func (r Router) bindRoute(method, path string, p *props) {
+func (r Router) bindRoute(method, path string, p *ops) {
 	r.routes[Route{method: method, path: path}] = p
 }
 
 // Get handles GET requests
 func (r Router) Get(path string, fn http.HandlerFunc) {
-	r.bindRoute(http.MethodGet, path, &props{fn: fn})
+	r.bindRoute(http.MethodGet, path, &ops{fn: fn})
 }
 
 // Post handles POST requests
 func (r Router) Post(path string, fn http.HandlerFunc) {
-	r.bindRoute(http.MethodPost, path, &props{fn: fn})
+	r.bindRoute(http.MethodPost, path, &ops{fn: fn})
 }
 
 // Put handles PUT requests
 func (r Router) Put(path string, fn http.HandlerFunc) {
-	r.bindRoute(http.MethodPut, path, &props{fn: fn})
+	r.bindRoute(http.MethodPut, path, &ops{fn: fn})
 }
 
 // Delete handles DELETE requests
 func (r Router) Delete(path string, fn http.HandlerFunc) {
-	r.bindRoute(http.MethodDelete, path, &props{fn: fn})
+	r.bindRoute(http.MethodDelete, path, &ops{fn: fn})
 }
 
 // Patch handles PATCH requests
 func (r Router) Patch(path string, fn http.HandlerFunc) {
-	r.bindRoute(http.MethodPatch, path, &props{fn: fn})
+	r.bindRoute(http.MethodPatch, path, &ops{fn: fn})
 }
 
 // Handle foo
 func (r Router) Handle(path string, h http.Handler) {
-	r.routes[Route{path: path}] = &props{handler: h}
+	r.routes[Route{path: path}] = &ops{handler: h}
 }
 
 // NotFound allows for a custom 404 handler to be set
@@ -188,13 +185,32 @@ func (r Router) findMatchingRouter(urlPath string) *Router {
 	return nil
 }
 
-func matches(pattern, path string) (bool, map[string]string) {
-	wildcard := strings.Contains(pattern, "*")
-	if strings.Index(pattern, ":") == -1 && !wildcard {
-		return strings.Trim(path, "/") == strings.Trim(pattern, "/"), nil
+// method returns either the request's overridden method value if it exists or the original method value
+func getMethod(r *http.Request) string {
+	switch r.Header.Get("Content-Type") {
+	case "multipart/form-data":
+		r.ParseMultipartForm(10 << 20)
+	case "text/html":
+		r.ParseForm()
+	default:
+		return r.Method
+	}
+	if method := r.FormValue("_method"); method != "" {
+		return strings.ToUpper(method)
+	}
+	return r.Method
+}
+
+func matches(route Route, method, path string, ignoreMethod bool) (bool, map[string]string) {
+	if !ignoreMethod && route.method != method {
+		return false, nil
+	}
+	wildcard := strings.Contains(route.path, "*")
+	if strings.Index(route.path, ":") == -1 && !wildcard {
+		return strings.Trim(route.path, "/") == strings.Trim(path, "/"), nil
 	}
 
-	pathParts, patternParts := slicePath(path), slicePath(pattern)
+	pathParts, patternParts := slicePath(path), slicePath(route.path)
 
 	if wildcard {
 		if len(pathParts) < len(patternParts) {

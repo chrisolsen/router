@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"sync"
 	"testing"
 	"time"
@@ -20,42 +21,52 @@ func (th testHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func TestRouteMatching(t *testing.T) {
-
-	tests := map[string]map[string]bool{
-		"/users/:name": map[string]bool{
-			"/":            false,
-			"/users":       false,
-			"/users/":      false,
-			"/users/123":   true,
-			"/users/john":  true,
-			"/users/john/": true,
+	type req struct {
+		method       string
+		path         string
+		matches      bool
+		ignoreMethod bool
+	}
+	tests := map[Route][]req{
+		Route{method: "GET", path: "/users/:name"}: []req{
+			req{"GET", "/", false, false},
+			req{"GET", "/users", false, false},
+			req{"GET", "/users/", false, false},
+			req{"GET", "/users/123", true, false},
+			req{"GET", "/users/john", true, false},
+			req{"GET", "/users/john/", true, false},
+			req{"POST", "/users/john/", false, false},
+			req{"POST", "/users/john/", true, true},
 		},
-		"/projects/:id/approve": map[string]bool{
-			"/":                      false,
-			"/projects":              false,
-			"/projects/":             false,
-			"/projects/123":          false,
-			"/projects/123/":         false,
-			"/projects/123/approve":  true,
-			"/projects/123/approve/": true,
-			"/projects/123/deny":     false,
+		Route{method: "GET", path: "/projects/:id/approve"}: []req{
+			req{"GET", "/", false, false},
+			req{"GET", "/projects", false, false},
+			req{"GET", "/projects/", false, false},
+			req{"GET", "/projects/123", false, false},
+			req{"GET", "/projects/123/approve", true, false},
+			req{"GET", "/projects/123/approve/", true, false},
+			req{"POST", "/projects/123/approve/", false, false},
+			req{"POST", "/projects/123/approve/", true, true},
+			req{"GET", "/projects/123/deny", false, false},
 		},
-		"/users/*": map[string]bool{
-			"/users":       false,
-			"/users/a":     true,
-			"/users/a/b":   true,
-			"/users/a/b/c": true,
+		Route{method: "GET", path: "/users/*"}: []req{
+			req{"GET", "/users", false, false},
+			req{"GET", "/users/a", true, false},
+			req{"GET", "/users/a/b", true, false},
+			req{"GET", "/users/a/b/c", true, false},
+			req{"POST", "/users/a", false, false},
+			req{"POST", "/users/a", true, true},
 		},
 	}
 
-	for pattern, urls := range tests {
-		for url, shouldMatch := range urls {
-			matched, _ := matches(pattern, url)
-			if shouldMatch && !matched {
-				t.Errorf("%s should match %s", pattern, url)
+	for route, reqs := range tests {
+		for _, req := range reqs {
+			matched, _ := matches(route, req.method, req.path, req.ignoreMethod)
+			if req.matches && !matched {
+				t.Errorf("%s should match %s", route.path, req.path)
 			}
-			if !shouldMatch && matched {
-				t.Errorf("%s should not match %s", pattern, url)
+			if !req.matches && matched {
+				t.Errorf("%s should not match %s", route.path, req.path)
 			}
 		}
 	}
@@ -84,7 +95,6 @@ func TestNewRouter(t *testing.T) {
 }
 
 func TestServeHTTPHandlers(t *testing.T) {
-
 	tests := []struct {
 		handlerMethod string
 		handlerPath   string
@@ -186,7 +196,7 @@ func TestServeHTTPHandlers(t *testing.T) {
 		router.ServeHTTP(rec, req)
 
 		if rec.Code != test.expectedStatus {
-			t.Errorf("Invalid status code %d != %d", rec.Code, test.expectedStatus)
+			t.Errorf("%s: Invalid status code %d != %d", test.expectedResponse, rec.Code, test.expectedStatus)
 			return
 		}
 		if rec.Body.String() != test.expectedResponse {
@@ -645,5 +655,58 @@ func TestSubRouterMatching(t *testing.T) {
 		if test.matches != matches {
 			t.Errorf("failed to match: %s => %s", test.path, ss.basePath)
 		}
+	}
+}
+
+func Test_SetMethod(t *testing.T) {
+
+	tests := []struct {
+		contentType string
+		_method     string
+	}{
+		{"text/html", "PATCH"},
+		{"text/html", ""},
+		{"multipart/form-data", "PATCH"},
+	}
+
+	for _, test := range tests {
+		form := url.Values{}
+		form.Add("_method", test._method)
+		form.Add("first_name", "John")
+
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+
+		ch := make(chan bool)
+		rr := New("/")
+		rr.Post("/", func(w http.ResponseWriter, r *http.Request) {
+			if test._method != "" {
+				t.Error("should not make it into the post handler")
+			} else {
+				// if _method is blank the method is not overwritten
+				ch <- true
+			}
+		})
+		rr.Patch("/", func(w http.ResponseWriter, r *http.Request) {
+			ch <- true
+		})
+
+		r, _ := http.NewRequest("POST", "/", nil)
+		r.Form = form
+		r.Header.Set("Content-Type", test.contentType)
+		w := httptest.NewRecorder()
+
+		go func() {
+			select {
+			case <-ch:
+				wg.Done()
+			case <-time.Tick(100 * time.Millisecond):
+				t.Error("Patch request not run")
+				wg.Done()
+			}
+		}()
+
+		rr.ServeHTTP(w, r)
+		wg.Wait()
 	}
 }
