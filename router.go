@@ -93,8 +93,8 @@ func (r Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	method := getMethod(req)
 	rr := r.findMatchingRouter(req.URL.Path)
 	for route, ops := range rr.routes {
-		path := strings.Replace(req.URL.Path, r.basePath, "", 1)
-		if ok, params := matches(route, method, path, ops.handler != nil); ok {
+		path := strings.Replace(req.URL.Path, rr.basePath, "", 1)
+		if ok, params := matches(rr, route, method, path, ops.handler != nil); ok {
 			var handler http.HandlerFunc
 			if ops.fn != nil {
 				handler = ops.fn
@@ -201,16 +201,16 @@ func getMethod(r *http.Request) string {
 	return r.Method
 }
 
-func matches(route Route, method, path string, ignoreMethod bool) (bool, map[string]string) {
+func matches(router *Router, route Route, method, path string, ignoreMethod bool) (bool, map[string]string) {
 	if !ignoreMethod && route.method != method {
 		return false, nil
 	}
 	wildcard := strings.Contains(route.path, "*")
-	if strings.Index(route.path, ":") == -1 && !wildcard {
+	if !wildcard && !strings.Contains(route.path, ":") {
 		return strings.Trim(route.path, "/") == strings.Trim(path, "/"), nil
 	}
 
-	pathParts, patternParts := slicePath(path), slicePath(route.path)
+	pathParts, patternParts := slicePath(router.basePath+path), slicePath(route.path)
 
 	if wildcard {
 		if len(pathParts) < len(patternParts) {
