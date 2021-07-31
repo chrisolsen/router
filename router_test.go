@@ -20,6 +20,61 @@ func (th testHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(th.body))
 }
 
+func TestRouteMatching(t *testing.T) {
+	type req struct {
+		router       *Router
+		method       string
+		path         string
+		expectedResult      bool
+		ignoreMethod bool
+	}
+	rootRouter := New("/")
+	subRouter := rootRouter.SubRouter("/foo")
+	tests := map[Route][]req{
+		{method: "GET", path: "/users/:name"}: {
+			{&rootRouter, "GET", "/", false, false},
+			{&rootRouter, "GET", "/users", false, false},
+			{&rootRouter, "GET", "/users/", false, false},
+			{&rootRouter, "GET", "/users/123", true, false},
+			{&rootRouter, "GET", "/users/john", true, false},
+			{&rootRouter, "GET", "/users/john/", true, false},
+			{&rootRouter, "POST", "/users/john/", false, false},
+			{&rootRouter, "POST", "/users/john/", true, true},
+		},
+		{method: "GET", path: "/projects/:id/approve"}: {
+			{&rootRouter, "GET", "/", false, false},
+			{&rootRouter, "GET", "/projects", false, false},
+			{&rootRouter, "GET", "/projects/", false, false},
+			{&rootRouter, "GET", "/projects/123", false, false},
+			{&rootRouter, "GET", "/projects/123/approve", true, false},
+			{&rootRouter, "GET", "/projects/123/approve/", true, false},
+			{&rootRouter, "POST", "/projects/123/approve/", false, false},
+			{&rootRouter, "POST", "/projects/123/approve/", true, true},
+			{&rootRouter, "GET", "/projects/123/deny", false, false},
+		},
+		{method: "GET", path: "/users/*"}: {
+			{&rootRouter, "GET", "/users", false, false},
+			{&rootRouter, "GET", "/users/a", true, false},
+			{&rootRouter, "GET", "/users/a/b", true, false},
+			{&rootRouter, "GET", "/users/a/b/c", true, false},
+			{&rootRouter, "POST", "/users/a", false, false},
+			{&rootRouter, "POST", "/users/a", true, true},
+		},
+		{method: "GET", path: "/foo/users"}: {
+			{subRouter, "GET", "/users", true, false},
+		},
+	}
+
+	for route, reqs := range tests {
+		for _, req := range reqs {
+			result, _ := matches(req.router, route, req.method, req.path, req.ignoreMethod)
+			if req.expectedResult != result {
+				t.Errorf("%s should match %s", route.path, req.path)
+			}
+		}
+	}
+}
+
 func TestNewRouter(t *testing.T) {
 	tests := []struct {
 		expectedPath string
@@ -157,10 +212,26 @@ func TestServeHTTPHandlers(t *testing.T) {
 func TestServeHTTPHandlersWithSubroutes(t *testing.T) {
 	tests := []struct {
 		name           string
+		method         string
+		basePath       string
+		url            string
+		urlMatcher     string
 		expectedStatus int
 	}{
 		{
 			name:           "test 1",
+			method:         "GET",
+			basePath:       "/foo",
+			url:            "/foo",
+			urlMatcher:     "/",
+			expectedStatus: 200,
+		},
+		{
+			name:           "test 2",
+			method:         "GET",
+			basePath:       "/foo",
+			url:            "/foo/99",
+			urlMatcher:     "/:id",
 			expectedStatus: 200,
 		},
 		// TODO: Add more tests
@@ -168,15 +239,12 @@ func TestServeHTTPHandlersWithSubroutes(t *testing.T) {
 
 	for _, test := range tests {
 		router := New("/")
-		subRouter := router.SubRouter("/foo")
-		subRouter.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		subRouter := router.SubRouter(test.basePath)
+		subRouter.Get(test.urlMatcher, func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(200)
 		})
-		router.Get("/", func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(500)
-		})
 
-		req, err := http.NewRequest("GET", "/foo", nil)
+		req, err := http.NewRequest(test.method, test.url, nil)
 		if err != nil {
 			t.Error("failed to create request")
 			return
@@ -184,7 +252,7 @@ func TestServeHTTPHandlersWithSubroutes(t *testing.T) {
 		rec := httptest.NewRecorder()
 		router.ServeHTTP(rec, req)
 
-		if rec.Code != 200 {
+		if rec.Code != test.expectedStatus {
 			t.Errorf("%s: Invalid status code %d != %d", test.name, rec.Code, test.expectedStatus)
 			return
 		}

@@ -202,15 +202,20 @@ func getMethod(r *http.Request) string {
 }
 
 func matches(router *Router, route Route, method, path string, ignoreMethod bool) (bool, map[string]string) {
+	routePath := strings.Replace(route.path, router.basePath, "", 1)
+	if strings.Index(routePath, "/") != 0 {
+		routePath = "/" + routePath
+	}
+
 	if !ignoreMethod && route.method != method {
 		return false, nil
 	}
-	wildcard := strings.Contains(route.path, "*")
-	if !wildcard && !strings.Contains(route.path, ":") {
-		return strings.Trim(route.path, "/") == strings.Trim(path, "/"), nil
+	wildcard := strings.Contains(routePath, "*")
+	if !wildcard && !strings.Contains(routePath, ":") {
+		return strings.Trim(routePath, "/") == strings.Trim(path, "/"), nil
 	}
 
-	pathParts, patternParts := slicePath(router.basePath+path), slicePath(route.path)
+	pathParts, patternParts := slicePath(path), slicePath(routePath)
 
 	if wildcard {
 		if len(pathParts) < len(patternParts) {
